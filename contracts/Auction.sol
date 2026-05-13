@@ -1,107 +1,109 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.27;
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
-contract Auction {
-    uint256 public constant AUCTION_DURATION = 5 minutes;
-    uint256 public auctionCount;
-    struct AuctionItem {
-        address seller;
-        string itemName; // instead of NFT
-        address paymentToken; // address(0) = ETH
-        uint256 highestBid;
-        address highestBidder;
-        uint256 endTime;
-        bool ended;
-    }
+// // SPDX-License-Identifier: MIT
+// pragma solidity ^0.8.27;
+// interface IERC20 {
+//     function transfer(address to, uint256 amount) external returns (bool);
+//     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+// }
+// contract Auction {
+//     uint256 public constant AUCTION_DURATION = 5 minutes;
+//     uint256 public auctionCount;
+//     struct AuctionItem {
+//         address seller;
+//         string itemName; // instead of NFT
+//         address paymentToken; // address(0) = ETH
+//         uint256 highestBid;
+//         address highestBidder;
+//         uint256 endTime;
+//         bool ended;
+//     }
 
-    mapping(uint256 => AuctionItem) public auctions;
+//     mapping(uint256 => AuctionItem) public auctions;
 
-    mapping(address => uint256) public ethRefunds;
-    mapping(address => mapping(address => uint256)) public tokenRefunds;
+//     mapping(address => uint256) public ethRefunds;
+//     mapping(address => mapping(address => uint256)) public tokenRefunds;
 
-    function listItem(string memory itemName, address paymentToken) external returns (uint256 id) {
-        id = auctionCount++;
+//     function listItem(string memory itemName, address paymentToken) external returns (uint256 id) {
+//         require(bytes(itemName).length > 0, "Item name required");
 
-        auctions[id] = AuctionItem({
-            seller: msg.sender,
-            itemName: itemName,
-            paymentToken: paymentToken,
-            highestBid: 0,
-            highestBidder: address(0),
-            endTime: block.timestamp + AUCTION_DURATION,
-            ended: false
-        });
-    }
+//         id = auctionCount++;
 
-    function bidETH(uint256 id) external payable {
-        AuctionItem storage a = auctions[id];
+//         auctions[id] = AuctionItem({
+//             seller: msg.sender,
+//             itemName: itemName,
+//             paymentToken: paymentToken,
+//             highestBid: 0,
+//             highestBidder: address(0),
+//             endTime: block.timestamp + AUCTION_DURATION,
+//             ended: false
+//         });
+//     }
 
-        require(block.timestamp < a.endTime, "Auction ended");
-        require(!a.ended, "Already ended");
-        require(a.paymentToken == address(0), "Not ETH auction");
-        require(msg.value > a.highestBid, "Bid too low");
+//     function bidETH(uint256 id) external payable {
+//         AuctionItem storage a = auctions[id];
 
-        if (a.highestBidder != address(0)) {
-            ethRefunds[a.highestBidder] += a.highestBid;
-        }
+//         require(block.timestamp < a.endTime, "Auction ended");
+//         require(!a.ended, "Already ended");
+//         require(a.paymentToken == address(0), "Not ETH auction");
+//         require(msg.value > a.highestBid, "Bid too low");
 
-        a.highestBid = msg.value;
-        a.highestBidder = msg.sender;
-    }
+//         if (a.highestBidder != address(0)) {
+//             ethRefunds[a.highestBidder] += a.highestBid;
+//         }
 
-    function bidToken(uint256 id, uint256 amount) external {
-        AuctionItem storage a = auctions[id];
+//         a.highestBid = msg.value;
+//         a.highestBidder = msg.sender;
+//     }
 
-        require(block.timestamp < a.endTime, "Auction ended");
-        require(!a.ended, "Already ended");
-        require(a.paymentToken != address(0), "Not token auction");
-        require(amount > a.highestBid, "Bid too low");
+//     function bidToken(uint256 id, uint256 amount) external {
+//         AuctionItem storage a = auctions[id];
 
-        IERC20(a.paymentToken).transferFrom(msg.sender, address(this), amount);
+//         require(block.timestamp < a.endTime, "Auction ended");
+//         require(!a.ended, "Already ended");
+//         require(a.paymentToken != address(0), "Not token auction");
+//         require(amount > a.highestBid, "Bid too low");
 
-        if (a.highestBidder != address(0)) {
-            tokenRefunds[a.paymentToken][a.highestBidder] += a.highestBid;
-        }
+//         IERC20(a.paymentToken).transferFrom(msg.sender, address(this), amount);
 
-        a.highestBid = amount;
-        a.highestBidder = msg.sender;
-    }
+//         if (a.highestBidder != address(0)) {
+//             tokenRefunds[a.paymentToken][a.highestBidder] += a.highestBid;
+//         }
 
-    function endAuction(uint256 id) external {
-        AuctionItem storage a = auctions[id];
+//         a.highestBid = amount;
+//         a.highestBidder = msg.sender;
+//     }
 
-        require(block.timestamp >= a.endTime, "Not ended");
-        require(!a.ended, "Already closed");
+//     function endAuction(uint256 id) external {
+//         AuctionItem storage a = auctions[id];
 
-        a.ended = true;
+//         require(block.timestamp >= a.endTime, "Not ended");
+//         require(!a.ended, "Already closed");
 
-        if (a.highestBidder == address(0)) {
-            return;
-        }
+//         a.ended = true;
 
-        if (a.paymentToken == address(0)) {
-            payable(a.seller).transfer(a.highestBid);
-        } else {
-            IERC20(a.paymentToken).transfer(a.seller, a.highestBid);
-        }
-    }
+//         if (a.highestBidder == address(0)) {
+//             return;
+//         }
 
-    function withdrawETH() external {
-        uint256 amount = ethRefunds[msg.sender];
-        require(amount > 0, "Nothing to withdraw");
+//         if (a.paymentToken == address(0)) {
+//             payable(a.seller).transfer(a.highestBid);
+//         } else {
+//             IERC20(a.paymentToken).transfer(a.seller, a.highestBid);
+//         }
+//     }
 
-        ethRefunds[msg.sender] = 0;
-        payable(msg.sender).transfer(amount);
-    }
+//     function withdrawETH() external {
+//         uint256 amount = ethRefunds[msg.sender];
+//         require(amount > 0, "Nothing to withdraw");
 
-    function withdrawToken(address token) external {
-        uint256 amount = tokenRefunds[token][msg.sender];
-        require(amount > 0, "Nothing to withdraw");
+//         ethRefunds[msg.sender] = 0;
+//         payable(msg.sender).transfer(amount);
+//     }
 
-        tokenRefunds[token][msg.sender] = 0;
-        IERC20(token).transfer(msg.sender, amount);
-    }
-}
+//     function withdrawToken(address token) external {
+//         uint256 amount = tokenRefunds[token][msg.sender];
+//         require(amount > 0, "Nothing to withdraw");
+
+//         tokenRefunds[token][msg.sender] = 0;
+//         IERC20(token).transfer(msg.sender, amount);
+//     }
+// }
